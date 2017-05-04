@@ -16,11 +16,14 @@ from cleverhans.utils_tf import model_train, model_eval, batch_eval
 from cleverhans.attacks import fgsm
 from cleverhans.utils import cnn_model
 
+from PIL import Image
+import numpy as np
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('train_dir', '/tmp', 'Directory storing the saved model.')
 flags.DEFINE_string('filename', 'cifar10.ckpt', 'Filename to save model under.')
-flags.DEFINE_integer('nb_epochs', 10, 'Number of epochs to train model')
+flags.DEFINE_integer('nb_epochs', 15, 'Number of epochs to train model')
 flags.DEFINE_integer('batch_size', 128, 'Size of training batches')
 flags.DEFINE_float('learning_rate', 0.1, 'Learning rate for training')
 
@@ -45,6 +48,7 @@ def data_cifar10():
     else:
         X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 3)
         X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 3)
+
     X_train = X_train.astype('float32')
     X_test = X_test.astype('float32')
     X_train /= 255
@@ -84,6 +88,8 @@ def main(argv=None):
 
     # Get CIFAR10 test data
     X_train, Y_train, X_test, Y_test = data_cifar10()
+    img = to_image(X_train[1])
+    img.show()
 
     assert Y_train.shape[1] == 10.
     label_smooth = .1
@@ -120,6 +126,10 @@ def main(argv=None):
     eval_params = {'batch_size': FLAGS.batch_size}
     X_test_adv, = batch_eval(sess, [x], [adv_x], [X_test], args=eval_params)
     assert X_test_adv.shape[0] == 10000, X_test_adv.shape
+    img_adv = to_image(X_test_adv)
+    for i in range(1,10):
+        img_adv[i].show()
+        img_adv[i].save('adv_eg_'+str(i)+'.png')
 
     # Evaluate the accuracy of the CIFAR10 model on adversarial examples
     accuracy = model_eval(sess, x, y, predictions, X_test_adv, Y_test,
@@ -157,7 +167,14 @@ def main(argv=None):
                           args=eval_params)
     print('Test accuracy on adversarial examples: ' + str(accuracy))
 
-
+def to_image(example):
+    example *= 255
+    example = example.astype('uint8')
+    if len(example.shape) == 4:
+        img = [Image.fromarray(i, 'RGB') for i in example]
+    else:
+        img = Image.fromarray(example, 'RGB')
+    return img
 
 if __name__ == '__main__':
     app.run()
